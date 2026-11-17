@@ -153,8 +153,59 @@ TRANSCODE=1
 | Firewall Windows | PowerShell como admin: `New-NetFirewallRule -DisplayName "IPTV iPad" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private`. Dejá la red Wi-Fi marcada como **Privada**. |
 | Firewall Linux | `sudo ufw allow from 192.168.0.0/16 to any port 3000 proto tcp` |
 | Router | Desactivá el *aislamiento de clientes / AP isolation* (las redes de invitados suelen traerlo activado). |
-| Que no se duerma | macOS: `caffeinate -i npm start`. Windows: plan de energía sin suspensión. |
+| Que no se duerma | macOS: `caffeinate -i npm start` o, con launchd (ver "Que arranque solo"), la Mac configurada para no entrar en reposo. Windows: plan de energía sin suspensión. |
 | Prueba | En el Safari del iPad abrí `http://IP:3000/<clave>/api/status`. Si ves un JSON, la red anda. |
+
+## Que arranque solo (macOS)
+
+Con launchd, el servidor arranca al iniciar sesión y, si el proceso muere, vuelve solo en unos segundos (`KeepAlive`). Al caerse también termina su ffmpeg, así que no quedan procesos huérfanos.
+
+Guardá esto en `~/Library/LaunchAgents/com.iptv-ios5.server.plist`. Cambiá las rutas: `which node` y la carpeta del proyecto.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.iptv-ios5.server</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/RUTA/A/node</string>
+        <string>/RUTA/AL/PROYECTO/server.js</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/RUTA/A/LA/CARPETA/DE/node:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>WorkingDirectory</key>
+    <string>/RUTA/AL/PROYECTO</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+    <key>StandardOutPath</key>
+    <string>/RUTA/AL/PROYECTO/data/server.log</string>
+    <key>StandardErrorPath</key>
+    <string>/RUTA/AL/PROYECTO/data/server.log</string>
+</dict>
+</plist>
+```
+
+`WorkingDirectory` tiene que ser la carpeta del proyecto, porque de ahí se lee el `.env`. El `PATH` tiene que incluir ffmpeg.
+
+| Para | Comando |
+|---|---|
+| Instalar y arrancar | `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.iptv-ios5.server.plist` |
+| Reiniciar (por ejemplo, tras editar el `.env`) | `launchctl kickstart -k gui/$(id -u)/com.iptv-ios5.server` |
+| Ver si corre y cuántas veces se reinició | `launchctl print gui/$(id -u)/com.iptv-ios5.server \| grep -E "state\|runs\|last exit"` |
+| Ver el log | `tail -f data/server.log` |
+| Desinstalar | `launchctl bootout gui/$(id -u)/com.iptv-ios5.server` y borrar el `.plist` |
+
+Con `KeepAlive`, un `kill` común también lo reinicia. Para apagarlo de verdad, usá `bootout`.
 
 ## En el iPad
 
