@@ -154,10 +154,11 @@ function initialChannel() {
 
 const transcoder = TRANSCODE
   ? createTranscoder({
-      // Sólo la playlist de la variante, sin las renditions de audio aparte: en Pluto (la única
-      // fuente del catálogo que las usa) la variante ya trae el audio muxeado, y con dos
-      // playlists ffmpeg se desincroniza en los cortes y pierde la ventana en vivo (25 s).
+      // Primero sólo la playlist de la variante: en casi todos los canales trae el audio muxeado,
+      // y con dos playlists ffmpeg se desincroniza en los cortes y pierde la ventana en vivo
+      // (25 s). La master, con la pista de audio aparte, sólo si la variante viene sin audio.
       input: `http://127.0.0.1:${PORT}${BASE}/live/media.m3u8`,
+      audioInput: `http://127.0.0.1:${PORT}${BASE}/live/index.m3u8`,
       outDir: path.join(os.tmpdir(), 'iptv-ipad-hls'),
       height: Number(process.env.TRANSCODE_HEIGHT) || 480,
       videoKbps: Number(process.env.TRANSCODE_KBPS) || 1200,
