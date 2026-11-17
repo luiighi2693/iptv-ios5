@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>TV en vivo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="TV">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon-precomposed" href="apple-touch-icon.png">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #111; color: #eee; }
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  }
+  #home { padding-top: 90px; text-align: center; }
+  h1 { margin: 0 0 40px; font-size: 26px; font-weight: normal; letter-spacing: 4px; color: #777; }
+  .btn {
+    display: block; width: 70%; margin: 0 auto; padding: 52px 0;
+    font-size: 46px; font-weight: bold; color: #fff; text-decoration: none;
+    background: #1f8a3b; border: 4px solid #2fb653;
+    -webkit-border-radius: 28px; border-radius: 28px;
+  }
+  .btn.off { background: #2a2a2a; border-color: #3a3a3a; color: #777; }
+  .tri {
+    display: inline-block; width: 0; height: 0; margin-right: 22px; vertical-align: -2px;
+    border-style: solid; border-width: 20px 0 20px 32px;
+    border-color: transparent transparent transparent #fff;
+  }
+  .btn.off .tri { display: none; }
+  #channel { margin-top: 26px; font-size: 28px; color: #fff; }
+  #status { margin-top: 12px; font-size: 20px; color: #aaa; }
+  #channels {
+    display: block; width: 70%; margin: 40px auto 0; padding: 24px 0;
+    font-size: 30px; font-weight: bold; color: #fff; text-decoration: none;
+    background: #23395f; border: 3px solid #36598f;
+    -webkit-border-radius: 22px; border-radius: 22px;
+  }
+  #native { display: inline-block; margin-top: 40px; padding: 12px 20px; font-size: 18px; color: #6af; text-decoration: none; }
+
+  .bar { height: 56px; line-height: 56px; padding: 0 12px; background: #1a1a1a; overflow: hidden; white-space: nowrap; }
+  .back {
+    display: inline-block; padding: 0 22px; line-height: 40px; vertical-align: middle;
+    font-size: 22px; color: #fff; text-decoration: none; background: #444;
+    -webkit-border-radius: 10px; border-radius: 10px;
+  }
+  .title { display: inline-block; margin-left: 18px; vertical-align: middle; font-size: 20px; color: #aaa; }
+
+  #menu { display: none; }
+  #list a {
+    display: block; height: 72px; line-height: 72px; padding: 0 24px;
+    font-size: 24px; color: #eee; text-decoration: none; border-bottom: 1px solid #262626;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+  #list a.on { color: #4cd964; }
+  #list a.dead { color: #888; }
+  #list .n { float: right; margin-left: 16px; font-size: 20px; color: #777; }
+  #list .n .b { width: 12px; height: 12px; margin-right: 8px; vertical-align: 0; }
+
+  /* Foco de estado: verde = validado, amarillo = por validar, gris = no respondió */
+  .b {
+    display: inline-block; width: 18px; height: 18px; margin-right: 16px; vertical-align: -1px;
+    background: #555; -webkit-border-radius: 9px; border-radius: 9px;
+  }
+  .b.ok { background: #34c759; -webkit-box-shadow: 0 0 8px #34c759; box-shadow: 0 0 8px #34c759; }
+  .b.pending { background: #ffcc00; }
+  .b.dead { background: #5a5a5a; }
+  .b.checking { background: #ffcc00; -webkit-animation: blink 0.7s infinite alternate; }
+  @-webkit-keyframes blink { from { opacity: 1; } to { opacity: 0.2; } }
+  #list .v {
+    float: right; margin: 15px 0 0 16px; padding: 0 16px; line-height: 42px;
+    font-size: 18px; color: #ddd; background: #333;
+    -webkit-border-radius: 8px; border-radius: 8px;
+  }
+
+  .search { float: right; margin: 8px 0 0 12px; }
+  #q {
+    width: 260px; height: 40px; padding: 0 12px; margin: 0;
+    font-size: 20px; color: #fff; background: #333; border: 0; outline: none;
+    -webkit-appearance: none; -webkit-border-radius: 8px; border-radius: 8px;
+  }
+  #list .note { padding: 40px 24px; font-size: 22px; color: #aaa; text-align: center; }
+  #pager { display: none; height: 82px; line-height: 82px; padding: 0 12px; text-align: center; font-size: 20px; color: #aaa; }
+  #pager a {
+    display: inline-block; padding: 0 24px; line-height: 54px; vertical-align: middle;
+    font-size: 22px; color: #fff; text-decoration: none; background: #333;
+    -webkit-border-radius: 10px; border-radius: 10px;
+  }
+  #pager a.off { visibility: hidden; }
+  #prev { float: left; margin-top: 14px; }
+  #next { float: right; margin-top: 14px; }
+
+  #player { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; }
+  #video { display: block; width: 100%; background: #000; }
+</style>
+</head>
+<body>
+<div id="home">
+  <h1>TV EN VIVO</h1>
+  <a id="play" class="btn off" href="#"><span class="tri"></span><span id="label">Esperando señal</span></a>
+  <div id="channel"></div>
+  <div id="status">Conectando con el servidor…</div>
+  <a id="channels" href="#">CANALES</a>
+  <a id="native" href="#">Abrir en el reproductor nativo de iOS</a>
+</div>
+
+<div id="menu">
+  <div class="bar">
+    <form id="searchForm" class="search" action="#"><input id="q" type="search" placeholder="Buscar canal" autocomplete="off" autocorrect="off" autocapitalize="off"></form>
+    <a id="menuBack" class="back" href="#">&lsaquo; Volver</a><span id="menuTitle" class="title">Canales</span>
+  </div>
+  <div id="list"></div>
+  <div id="pager"><a id="prev" href="#">&lsaquo; Anterior</a><span id="pageInfo"></span><a id="next" href="#">Siguiente &rsaquo;</a></div>
+</div>
+
+<div id="player">
+  <div class="bar"><a id="back" class="back" href="#">&lsaquo; Volver</a><span id="msg" class="title"></span></div>
+  <video id="video" controls x-webkit-airplay="allow"></video>
+</div>
+
+<script>
+// JavaScript ES3/ES5 a propósito: Safari de iOS 5 no entiende let/const, arrow
+// functions, Promise, fetch ni Function.prototype.bind.
+(function () {
+  var POLL_MS = 10000;
+  var XHR_TIMEOUT_MS = 8000;
+  var VALIDATE_TIMEOUT_MS = 30000; // el servidor prueba playlist, variante y un segmento
+  var SEARCH_DELAY_MS = 300;
+  var RETRY_MS = 4000;
+  var BAR_HEIGHT = 56;
+  var ROW_HEIGHT = 73;
+  var PAGER_HEIGHT = 82;
+
+  var playUrl = null;   // enlace vigente según el servidor
+  var watchUrl = null;  // enlace que se está mirando (sobrevive a cortes del sondeo)
+  var watching = false;
+  var askedFullscreen = false;
+  var lastTime = -1;
+  var frozenPolls = 0;
+  var retryTimer = null;
+  var channelName = '';
+
+  // Menú: { active, play, groups: [{ name, channels: [[id, nombre, estado], ...] }] }
+  // estado: 'ok' (verde), 'pending' (amarillo), 'dead' (gris); 'checking' sólo existe acá.
+  var catalog = null;
+  var groupIndex = -1;  // -1: lista de categorías
+  var page = 0;
+  var query = '';       // búsqueda activa ('' = navegando categorías)
+  var results = null;   // canales que coinciden con la búsqueda
+  var folded = {};      // id → nombre en minúsculas y sin acentos
+  var searchTimer = null;
+  var STATUS_RANK = { ok: 0, pending: 1, checking: 1, dead: 2 };
+
+  function $(id) { return document.getElementById(id); }
+  function setText(id, value) { $(id).textContent = value; }
+  function show(id, visible) { $(id).style.display = visible ? 'block' : 'none'; }
+  function now() { return new Date().getTime(); }
+  function bust(url, key) { return url + (url.indexOf('?') === -1 ? '?' : '&') + key + '=' + now(); }
+  function escapeHtml(text) {
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // XMLHttpRequest clásico con timeout manual (xhr.timeout no es confiable en iOS 5).
+  // Las rutas van relativas ('api/...'): la página vive bajo /<clave>/.
+  function request(method, url, body, timeoutMs, done) {
+    var xhr = new XMLHttpRequest();
+    var finished = false;
+    var timer = setTimeout(function () {
+      if (finished) return;
+      finished = true;
+      xhr.abort();
+      done(0, '', null);
+    }, timeoutMs);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || finished) return;
+      finished = true;
+      clearTimeout(timer);
+      done(xhr.status, xhr.responseText, xhr);
+    };
+    xhr.open(method, method === 'GET' ? bust(url, '_') : url, true);
+    if (body !== null) xhr.setRequestHeader('Content-Type', 'text/plain');
+    xhr.send(body);
+  }
+
+  function get(url, done) {
+    request('GET', url, null, XHR_TIMEOUT_MS, done);
+  }
+
+  function ago(seconds) {
+    if (seconds < 60) return 'hace ' + seconds + ' s';
+    if (seconds < 3600) return 'hace ' + Math.floor(seconds / 60) + ' min';
+    return 'hace ' + Math.floor(seconds / 3600) + ' h';
+  }
+
+  function setChannel(name) {
+    channelName = name || '';
+    setText('channel', channelName);
+  }
+
+  function setReady(url, ageHeader) {
+    var age = parseInt(ageHeader, 10);
+    playUrl = url;
+    $('play').className = 'btn';
+    $('play').href = url;
+    $('native').href = url;
+    setText('label', 'VER EN VIVO');
+    setText('status', isNaN(age) ? 'Señal disponible' : 'Señal disponible · token renovado ' + ago(age));
+  }
+
+  function setWaiting(message) {
+    playUrl = null;
+    $('play').className = 'btn off';
+    $('play').href = '#';
+    $('native').href = '#';
+    setText('label', 'Esperando señal');
+    setText('status', message);
+  }
+
+  function poll() {
+    get('api/clip', function (status, body, xhr) {
+      var name = xhr && xhr.getResponseHeader('X-Channel');
+      if (name) {
+        try { setChannel(decodeURIComponent(name)); } catch (e) { /* header mal formado */ }
+      }
+      if (status === 200 && body) setReady(body.replace(/\s+/g, ''), xhr.getResponseHeader('X-Clip-Age'));
+      else if (status === 204) setWaiting('Buscando la señal del canal…');
+      else setWaiting('Sin conexión con el servidor, reintentando…');
+      checkFrozen();
+      setTimeout(poll, POLL_MS);
+    });
+  }
+
+  // ---- Menú de canales: categorías → canales, en páginas que entran en la pantalla (con
+  // 256 MB de RAM no conviene armar cientos de filas de una).
+
+  function pageSize() {
+    return Math.max(4, Math.floor((window.innerHeight - BAR_HEIGHT - PAGER_HEIGHT) / ROW_HEIGHT));
+  }
+
+  function note(text) {
+    $('list').innerHTML = '<div class="note">' + escapeHtml(text) + '</div>';
+    show('pager', false);
+  }
+
+  function openMenu() {
+    show('home', false);
+    show('menu', true);
+    groupIndex = -1;
+    page = 0;
+    clearSearch();
+    folded = {};
+    setText('menuTitle', 'Canales');
+    note('Cargando canales…');
+    get('api/channels', function (status, body) {
+      catalog = null;
+      if (status === 200) {
+        try { catalog = JSON.parse(body); } catch (e) { catalog = null; }
+      }
+      if (!catalog) return note('No pude cargar los canales. Volvé a intentar.');
+      if (!catalog.groups.length) return note('Todavía no hay canales: el servidor está armando el catálogo. Probá en un minuto.');
+      renderMenu();
+    });
+    return false;
+  }
+
+  function closeMenu() {
+    if (query) {
+      clearSearch();
+      renderMenu();
+      return false;
+    }
+    if (groupIndex >= 0 && catalog) {
+      groupIndex = -1;
+      page = 0;
+      renderMenu();
+      return false;
+    }
+    show('menu', false);
+    show('home', true);
+    return false;
+  }
+
+  // ---- Búsqueda por nombre en todas las categorías
+
+  // Minúsculas y sin acentos (iOS 5 no tiene String.prototype.normalize).
+  function fold(text) {
+    return String(text).toLowerCase()
+      .replace(/[áàäâã]/g, 'a').replace(/[éèëê]/g, 'e').replace(/[íìïî]/g, 'i')
+      .replace(/[óòöôõ]/g, 'o').replace(/[úùüû]/g, 'u').replace(/ñ/g, 'n').replace(/ç/g, 'c');
+  }
+
+  // Sin repetir los canales que están en varias categorías; los que andan, primero.
+  function search(text) {
+    var needle = fold(text);
+    var seen = {};
+    var found = [];
+    var i, j, channel;
+    for (i = 0; i < catalog.groups.length; i++) {
+      for (j = 0; j < catalog.groups[i].channels.length; j++) {
+        channel = catalog.groups[i].channels[j];
+        if (seen[channel[0]]) continue;
+        seen[channel[0]] = true;
+        if (folded[channel[0]] === undefined) folded[channel[0]] = fold(channel[1]);
+        if (folded[channel[0]].indexOf(needle) !== -1) found.push({ c: channel, i: found.length });
+      }
+    }
+    // sort no es estable en todos los motores: se desempata por posición.
+    found.sort(function (a, b) { return (STATUS_RANK[a.c[2]] - STATUS_RANK[b.c[2]]) || (a.i - b.i); });
+    for (i = 0; i < found.length; i++) found[i] = found[i].c;
+    return found;
+  }
+
+  function clearSearch() {
+    clearTimeout(searchTimer);
+    query = '';
+    results = null;
+    $('q').value = '';
+    page = 0;
+  }
+
+  function onSearch() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      var text = $('q').value.replace(/^\s+|\s+$/g, '');
+      if (text.length < 2) text = '';
+      if (text === query || !catalog) return;
+      query = text;
+      results = query ? search(query) : null;
+      page = 0;
+      renderMenu();
+    }, SEARCH_DELAY_MS);
+  }
+
+  // ---- Filas: categoría (verdes / total) o canal (foco + botón de validar)
+
+  function groupRow(key, group) {
+    var ok = 0;
+    for (var i = 0; i < group.channels.length; i++) if (group.channels[i][2] === 'ok') ok++;
+    return '<a href="#" data-key="' + key + '"><span class="n"><span class="b ' + (ok ? 'ok' : 'dead') + '"></span>' + ok + ' / ' +
+      group.channels.length + '</span>' + escapeHtml(group.name) + '</a>';
+  }
+
+  function channelRow(key, channel) {
+    var status = channel[2] || 'ok';
+    var on = channel[0] === catalog.active;
+    var label = status === 'checking' ? '&hellip;' : status === 'pending' ? 'Validar' : 'Revalidar';
+    // La página de TARGET_URL la captura Chrome: no hay chequeo rápido que hacerle.
+    var button = channel[0].indexOf('page:') === 0 ? '' : '<span class="v" data-v="1">' + label + '</span>';
+    return '<a href="#" data-key="' + key + '"' + (on ? ' class="on"' : status === 'dead' ? ' class="dead"' : '') + '>' +
+      button + '<span class="b ' + status + '"></span>' + (on ? '&#9654; ' : '') + escapeHtml(channel[1]) + '</a>';
+  }
+
+  function renderMenu() {
+    var size = pageSize();
+    var html = '';
+    var count, pages, first, last, i, group;
+
+    if (query) {
+      count = results.length;
+      setText('menuTitle', count + (count === 1 ? ' canal' : ' canales'));
+      if (!count) return note('Ningún canal coincide con "' + query + '".');
+    } else if (groupIndex < 0) {
+      setText('menuTitle', 'Canales');
+      count = catalog.groups.length;
+    } else {
+      group = catalog.groups[groupIndex];
+      setText('menuTitle', group.name);
+      count = group.channels.length;
+    }
+
+    // Sólo se arma la página visible: con 256 MB no conviene generar miles de filas.
+    pages = Math.max(1, Math.ceil(count / size));
+    if (page >= pages) page = pages - 1;
+    first = page * size;
+    last = Math.min(count, first + size);
+    for (i = first; i < last; i++) {
+      if (query) html += channelRow(i, results[i]);
+      else if (groupIndex < 0) html += groupRow(i, catalog.groups[i]);
+      else html += channelRow(i, group.channels[i]);
+    }
+    $('list').innerHTML = html;
+    show('pager', pages > 1);
+    setText('pageInfo', (page + 1) + ' / ' + pages);
+    $('prev').className = page > 0 ? '' : 'off';
+    $('next').className = page < pages - 1 ? '' : 'off';
+    window.scrollTo(0, 0);
+  }
+
+  // Al entrar a una categoría, saltar a la página donde está el canal que se está mirando.
+  function pageOfActive(group) {
+    for (var i = 0; i < group.channels.length; i++) {
+      if (group.channels[i][0] === catalog.active) return Math.floor(i / pageSize());
+    }
+    return 0;
+  }
+
+  function choose(channel) {
+    var xhr = new XMLHttpRequest();
+    var ok = false;
+    try {
+      // Síncrono a propósito: así seguimos dentro del toque y iOS deja arrancar el video.
+      // El servidor responde al instante; la señal nueva la espera el propio reproductor.
+      xhr.open('POST', 'api/channel', false);
+      xhr.setRequestHeader('Content-Type', 'text/plain');
+      xhr.send(channel[0]);
+      ok = xhr.status === 204;
+    } catch (e) {
+      ok = false;
+    }
+    if (!ok) return note('No pude cambiar a ' + channel[1] + '. Volvé a intentar.');
+    catalog.active = channel[0];
+    setChannel(channel[1]);
+    show('menu', false);
+    openPlayer(catalog.play);
+  }
+
+  // Un canal puede estar en varias categorías, y cada una tiene su propia fila.
+  function setStatus(id, status) {
+    var i, j, rows;
+    for (i = 0; i < catalog.groups.length; i++) {
+      rows = catalog.groups[i].channels;
+      for (j = 0; j < rows.length; j++) if (rows[j][0] === id) rows[j][2] = status;
+    }
+  }
+
+  // Chequeo a pedido: el foco titila hasta que el servidor responde. La fila no se mueve de
+  // lugar (el orden por estado se recalcula al volver a abrir el menú).
+  function validateChannel(channel) {
+    var id = channel[0];
+    var previous = channel[2];
+    if (previous === 'checking') return;
+    setStatus(id, 'checking');
+    renderMenu();
+    request('POST', 'api/validate', id, VALIDATE_TIMEOUT_MS, function (status, body) {
+      var answer = null;
+      if (status === 200) {
+        try { answer = JSON.parse(body).status; } catch (e) { answer = null; }
+      }
+      if (!catalog) return;
+      setStatus(id, answer || previous);
+      if ($('menu').style.display === 'block') renderMenu();
+    });
+  }
+
+  $('list').onclick = function (event) {
+    var el = event.target;
+    var onButton = false;
+    var key, channel;
+    if (el && el.nodeType === 3) el = el.parentNode; // WebKit viejo puede entregar el nodo de texto
+    while (el && el !== this && !el.getAttribute('data-key')) {
+      if (el.getAttribute('data-v')) onButton = true;
+      el = el.parentNode;
+    }
+    if (!el || el === this || !catalog) return false;
+    key = parseInt(el.getAttribute('data-key'), 10);
+    if (!query && groupIndex < 0) {
+      groupIndex = key;
+      page = pageOfActive(catalog.groups[key]);
+      renderMenu();
+      return false;
+    }
+    channel = query ? results[key] : catalog.groups[groupIndex].channels[key];
+    if (onButton) validateChannel(channel);
+    else choose(channel);
+    return false;
+  };
+
+  $('q').oninput = onSearch;
+  $('q').onkeyup = onSearch;
+  $('q').onsearch = onSearch; // la ✕ del campo de búsqueda de WebKit
+  // "Buscar" del teclado: lo esconde para que se vean los resultados.
+  $('searchForm').onsubmit = function () {
+    $('q').blur();
+    onSearch();
+    return false;
+  };
+
+  $('prev').onclick = function () {
+    if (page > 0) { page--; renderMenu(); }
+    return false;
+  };
+  $('next').onclick = function () {
+    page++;
+    renderMenu();
+    return false;
+  };
+
+  // ---- Reproductor: <video> nativo. Usa el mismo decodificador por hardware que
+  // QuickTime, pero nos deja reintentar solos si el stream se corta.
+
+  function video() { return $('video'); }
+  function setMsg(text) { setText('msg', text); }
+
+  function layout() {
+    video().style.height = Math.max(0, window.innerHeight - BAR_HEIGHT) + 'px';
+  }
+
+  function load(url) {
+    var v = video();
+    v.src = url;
+    v.load();
+    v.play();
+  }
+
+  function openPlayer(url) {
+    if (!url) return false;
+    watchUrl = url;
+    watching = true;
+    askedFullscreen = false;
+    lastTime = -1;
+    frozenPolls = 0;
+    show('home', false);
+    show('menu', false);
+    show('player', true);
+    layout();
+    setMsg('Cargando ' + (channelName || '…'));
+    load(bust(watchUrl, 'r')); // play() dentro del toque: iOS exige un gesto del usuario
+    return false;
+  }
+
+  function closePlayer() {
+    var v = video();
+    watching = false;
+    clearTimeout(retryTimer);
+    v.pause();
+    v.removeAttribute('src');
+    v.load(); // suelta el decodificador y la RAM: con 256 MB importa
+    show('player', false);
+    show('home', true);
+    return false;
+  }
+
+  function retry(reason) {
+    if (!watching) return;
+    setMsg(reason + ' · reconectando…');
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(function () {
+      if (!watching) return;
+      lastTime = -1;
+      frozenPolls = 0;
+      load(bust(watchUrl, 'r'));
+    }, RETRY_MS);
+  }
+
+  // Imagen congelada dos sondeos seguidos (~20 s) sin que el usuario haya pausado: recargar.
+  function checkFrozen() {
+    var v = video();
+    if (!watching) return;
+    if (v.paused) { frozenPolls = 0; return; }
+    if (v.currentTime === lastTime) frozenPolls++;
+    else frozenPolls = 0;
+    lastTime = v.currentTime;
+    if (frozenPolls >= 2) retry('Imagen congelada');
+  }
+
+  var v = video();
+  v.addEventListener('playing', function () {
+    setMsg(channelName ? 'En vivo · ' + channelName : 'En vivo');
+    if (!askedFullscreen && v.webkitEnterFullscreen) {
+      askedFullscreen = true;
+      try { v.webkitEnterFullscreen(); } catch (e) { /* iOS puede negarlo fuera de un toque */ }
+    }
+  }, false);
+  v.addEventListener('waiting', function () { setMsg('Cargando…'); }, false);
+  v.addEventListener('error', function () { retry('Error de reproducción'); }, false);
+  v.addEventListener('ended', function () { retry('La transmisión se cortó'); }, false);
+
+  $('play').onclick = function () { return openPlayer(playUrl); };
+  $('channels').onclick = openMenu;
+  $('menuBack').onclick = closeMenu;
+  $('back').onclick = closePlayer;
+  $('native').onclick = function () { return playUrl !== null; };
+  window.onresize = function () {
+    layout();
+    if (catalog && $('menu').style.display === 'block') renderMenu();
+  };
+  window.onorientationchange = window.onresize;
+
+  poll();
+})();
+</script>
+</body>
+</html>
