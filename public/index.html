@@ -35,12 +35,13 @@
   .btn.off .tri { display: none; }
   #channel { margin-top: 26px; font-size: 28px; color: #fff; }
   #status { margin-top: 12px; font-size: 20px; color: #aaa; }
-  #channels {
+  .nav {
     display: block; width: 70%; margin: 40px auto 0; padding: 24px 0;
     font-size: 30px; font-weight: bold; color: #fff; text-decoration: none;
     background: #23395f; border: 3px solid #36598f;
     -webkit-border-radius: 22px; border-radius: 22px;
   }
+  #youtube { margin-top: 20px; background: #6e1d1d; border-color: #9c2c2c; }
   #native { display: inline-block; margin-top: 40px; padding: 12px 20px; font-size: 18px; color: #6af; text-decoration: none; }
 
   .bar { height: 56px; line-height: 56px; padding: 0 12px; background: #1a1a1a; overflow: hidden; white-space: nowrap; }
@@ -51,7 +52,7 @@
   }
   .title { display: inline-block; margin-left: 18px; vertical-align: middle; font-size: 20px; color: #aaa; }
 
-  #menu { display: none; }
+  #menu, #yt { display: none; }
   #list a {
     display: block; height: 72px; line-height: 72px; padding: 0 24px;
     font-size: 24px; color: #eee; text-decoration: none; border-bottom: 1px solid #262626;
@@ -79,21 +80,28 @@
   }
 
   .search { float: right; margin: 8px 0 0 12px; }
-  #q {
+  #q, #ytq {
     width: 260px; height: 40px; padding: 0 12px; margin: 0;
     font-size: 20px; color: #fff; background: #333; border: 0; outline: none;
     -webkit-appearance: none; -webkit-border-radius: 8px; border-radius: 8px;
   }
-  #list .note { padding: 40px 24px; font-size: 22px; color: #aaa; text-align: center; }
-  #pager { display: none; height: 82px; line-height: 82px; padding: 0 12px; text-align: center; font-size: 20px; color: #aaa; }
-  #pager a {
+  #ytq { width: 360px; }
+  .note { padding: 40px 24px; font-size: 22px; color: #aaa; text-align: center; }
+  #pager, #ytPager { display: none; height: 82px; line-height: 82px; padding: 0 12px; text-align: center; font-size: 20px; color: #aaa; }
+  #pager a, #ytPager a {
     display: inline-block; padding: 0 24px; line-height: 54px; vertical-align: middle;
     font-size: 22px; color: #fff; text-decoration: none; background: #333;
     -webkit-border-radius: 10px; border-radius: 10px;
   }
-  #pager a.off { visibility: hidden; }
-  #prev { float: left; margin-top: 14px; }
-  #next { float: right; margin-top: 14px; }
+  #pager a.off, #ytPager a.off { visibility: hidden; }
+  #prev, #ytPrev { float: left; margin-top: 14px; }
+  #next, #ytNext { float: right; margin-top: 14px; }
+
+  /* YouTube: miniatura, título (hasta dos líneas) y duración · canal */
+  #ytList a { display: block; height: 100px; color: #eee; text-decoration: none; border-bottom: 1px solid #262626; overflow: hidden; }
+  #ytList img { float: left; width: 160px; height: 90px; margin: 5px 18px 5px 12px; background: #222; }
+  #ytList .t { display: block; margin: 14px 24px 0 0; font-size: 22px; line-height: 28px; max-height: 56px; overflow: hidden; }
+  #ytList .m { display: block; margin: 6px 24px 0 0; font-size: 17px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   #player { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; }
   #video { display: block; width: 100%; background: #000; }
@@ -105,7 +113,8 @@
   <a id="play" class="btn off" href="#"><span class="tri"></span><span id="label">Esperando señal</span></a>
   <div id="channel"></div>
   <div id="status">Conectando con el servidor…</div>
-  <a id="channels" href="#">CANALES</a>
+  <a id="channels" class="nav" href="#">CANALES</a>
+  <a id="youtube" class="nav" href="#">YOUTUBE</a>
   <a id="native" href="#">Abrir en el reproductor nativo de iOS</a>
 </div>
 
@@ -116,6 +125,15 @@
   </div>
   <div id="list"></div>
   <div id="pager"><a id="prev" href="#">&lsaquo; Anterior</a><span id="pageInfo"></span><a id="next" href="#">Siguiente &rsaquo;</a></div>
+</div>
+
+<div id="yt">
+  <div class="bar">
+    <form id="ytForm" class="search" action="#"><input id="ytq" type="search" placeholder="Buscar en YouTube" autocomplete="off" autocorrect="off" autocapitalize="off"></form>
+    <a id="ytBack" class="back" href="#">&lsaquo; Volver</a><span id="ytTitle" class="title">YouTube</span>
+  </div>
+  <div id="ytList"></div>
+  <div id="ytPager"><a id="ytPrev" href="#">&lsaquo; Anterior</a><span id="ytPageInfo"></span><a id="ytNext" href="#">Siguiente &rsaquo;</a></div>
 </div>
 
 <div id="player">
@@ -135,6 +153,8 @@
   var BAR_HEIGHT = 56;
   var ROW_HEIGHT = 73;
   var PAGER_HEIGHT = 82;
+  var YT_ROW_HEIGHT = 101;
+  var YT_SEARCH_TIMEOUT_MS = 60000; // yt-dlp tarda unos segundos en buscar
 
   var playUrl = null;   // enlace vigente según el servidor
   var watchUrl = null;  // enlace que se está mirando (sobrevive a cortes del sondeo)
@@ -144,6 +164,16 @@
   var frozenPolls = 0;
   var retryTimer = null;
   var channelName = '';
+  var watchTitle = '';  // qué dice la barra del reproductor
+  var vod = false;      // un video de YouTube (con principio y fin) en vez de un canal en vivo
+  var resumeAt = 0;     // segundo donde retomar un video tras reconectar
+  var returnTo = 'home';
+
+  // YouTube: [[id, título, canal, segundos], ...] de la última búsqueda
+  var ytItems = null;
+  var ytQuery = '';
+  var ytPage = 0;
+  var ytSeq = 0;        // descarta respuestas de búsquedas anteriores
 
   // Menú: { active, play, groups: [{ name, channels: [[id, nombre, estado], ...] }] }
   // estado: 'ok' (verde), 'pending' (amarillo), 'dead' (gris); 'checking' sólo existe acá.
@@ -490,6 +520,109 @@
     return false;
   };
 
+  // ---- YouTube: el servidor busca con yt-dlp y arma un HLS que el iPad lee tal cual.
+
+  function ytNote(text) {
+    $('ytList').innerHTML = '<div class="note">' + escapeHtml(text) + '</div>';
+    show('ytPager', false);
+  }
+
+  function duration(seconds) {
+    var h = Math.floor(seconds / 3600);
+    var m = Math.floor(seconds / 60) % 60;
+    var s = seconds % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function openYouTube() {
+    show('home', false);
+    show('yt', true);
+    if (ytItems) renderYouTube();
+    else ytNote('Escribí qué querés ver y tocá Buscar.');
+    return false;
+  }
+
+  function closeYouTube() {
+    show('yt', false);
+    show('home', true);
+    $('ytList').innerHTML = ''; // suelta las miniaturas: con 256 MB importa
+    return false;
+  }
+
+  function ytSearch() {
+    var text = $('ytq').value.replace(/^\s+|\s+$/g, '');
+    var seq = ++ytSeq;
+    $('ytq').blur(); // esconde el teclado para que se vean los resultados
+    if (!text) return false;
+    ytQuery = text;
+    ytItems = null;
+    ytPage = 0;
+    setText('ytTitle', 'Buscando…');
+    ytNote('Buscando "' + text + '" en YouTube…');
+    request('GET', 'yt/search?q=' + encodeURIComponent(text), null, YT_SEARCH_TIMEOUT_MS, function (status, body) {
+      var data = null;
+      if (seq !== ytSeq) return;
+      if (status === 200) {
+        try { data = JSON.parse(body); } catch (e) { data = null; }
+      }
+      if (!data) {
+        setText('ytTitle', 'YouTube');
+        if (status === 404) return ytNote('YouTube está apagado en el servidor (YOUTUBE=0).');
+        return ytNote('No pude buscar' + (status && body ? ': ' + body : '') + '. Volvé a intentar.');
+      }
+      ytItems = data.items;
+      renderYouTube();
+    });
+    return false;
+  }
+
+  function renderYouTube() {
+    var size = Math.max(3, Math.floor((window.innerHeight - BAR_HEIGHT - PAGER_HEIGHT) / YT_ROW_HEIGHT));
+    var count = ytItems.length;
+    var pages = Math.max(1, Math.ceil(count / size));
+    var html = '';
+    var i, item;
+    setText('ytTitle', count + (count === 1 ? ' video' : ' videos'));
+    if (!count) return ytNote('No encontré videos para "' + ytQuery + '".');
+    if (ytPage >= pages) ytPage = pages - 1;
+    // Sólo la página visible: cada fila trae su miniatura.
+    for (i = ytPage * size; i < Math.min(count, (ytPage + 1) * size); i++) {
+      item = ytItems[i];
+      html += '<a href="#" data-key="' + i + '"><img src="yt/thumb/' + item[0] + '.jpg" width="160" height="90" alt="">' +
+        '<span class="t">' + escapeHtml(item[1]) + '</span>' +
+        '<span class="m">' + escapeHtml(duration(item[3]) + (item[2] ? ' · ' + item[2] : '')) + '</span></a>';
+    }
+    $('ytList').innerHTML = html;
+    show('ytPager', pages > 1);
+    setText('ytPageInfo', (ytPage + 1) + ' / ' + pages);
+    $('ytPrev').className = ytPage > 0 ? '' : 'off';
+    $('ytNext').className = ytPage < pages - 1 ? '' : 'off';
+    window.scrollTo(0, 0);
+  }
+
+  $('ytList').onclick = function (event) {
+    var el = event.target;
+    var item;
+    if (el && el.nodeType === 3) el = el.parentNode;
+    while (el && el !== this && !el.getAttribute('data-key')) el = el.parentNode;
+    if (!el || el === this || !ytItems) return false;
+    item = ytItems[parseInt(el.getAttribute('data-key'), 10)];
+    // Sin pedidos previos: play() tiene que salir dentro del toque. La playlist tarda unos
+    // segundos (el servidor resuelve el video) y el reproductor la espera.
+    return openPlayer('yt/' + item[0] + '/index.m3u8', { title: item[1], vod: true, from: 'yt' });
+  };
+
+  $('ytForm').onsubmit = ytSearch;
+  $('ytPrev').onclick = function () {
+    if (ytPage > 0) { ytPage--; renderYouTube(); }
+    return false;
+  };
+  $('ytNext').onclick = function () {
+    ytPage++;
+    renderYouTube();
+    return false;
+  };
+
   // ---- Reproductor: <video> nativo. Usa el mismo decodificador por hardware que
   // QuickTime, pero nos deja reintentar solos si el stream se corta.
 
@@ -507,18 +640,25 @@
     v.play();
   }
 
-  function openPlayer(url) {
+  // options: { title, vod, from }. Sin options, el canal en vivo.
+  function openPlayer(url, options) {
     if (!url) return false;
+    options = options || {};
     watchUrl = url;
     watching = true;
+    vod = Boolean(options.vod);
+    watchTitle = options.title || channelName;
+    returnTo = options.from || 'home';
+    resumeAt = 0;
     askedFullscreen = false;
     lastTime = -1;
     frozenPolls = 0;
     show('home', false);
     show('menu', false);
+    show('yt', false);
     show('player', true);
     layout();
-    setMsg('Cargando ' + (channelName || '…'));
+    setMsg((vod ? 'Preparando ' : 'Cargando ') + (watchTitle || '…'));
     load(bust(watchUrl, 'r')); // play() dentro del toque: iOS exige un gesto del usuario
     return false;
   }
@@ -531,12 +671,24 @@
     v.removeAttribute('src');
     v.load(); // suelta el decodificador y la RAM: con 256 MB importa
     show('player', false);
-    show('home', true);
+    show(returnTo, true);
     return false;
   }
 
+  // Un video que se recarga arranca de cero: se vuelve al segundo donde iba.
+  function resume() {
+    var v = video();
+    if (!resumeAt) return;
+    try {
+      v.currentTime = resumeAt;
+      resumeAt = 0;
+    } catch (e) { /* todavía no se puede saltar: se reintenta en el próximo evento */ }
+  }
+
   function retry(reason) {
+    var v = video();
     if (!watching) return;
+    if (vod && v.currentTime > 0) resumeAt = v.currentTime;
     setMsg(reason + ' · reconectando…');
     clearTimeout(retryTimer);
     retryTimer = setTimeout(function () {
@@ -560,7 +712,8 @@
 
   var v = video();
   v.addEventListener('playing', function () {
-    setMsg(channelName ? 'En vivo · ' + channelName : 'En vivo');
+    if (vod) setMsg(watchTitle);
+    else setMsg(channelName ? 'En vivo · ' + channelName : 'En vivo');
     if (!askedFullscreen && v.webkitEnterFullscreen) {
       askedFullscreen = true;
       try { v.webkitEnterFullscreen(); } catch (e) { /* iOS puede negarlo fuera de un toque */ }
@@ -568,16 +721,24 @@
   }, false);
   v.addEventListener('waiting', function () { setMsg('Cargando…'); }, false);
   v.addEventListener('error', function () { retry('Error de reproducción'); }, false);
-  v.addEventListener('ended', function () { retry('La transmisión se cortó'); }, false);
+  v.addEventListener('loadedmetadata', resume, false);
+  v.addEventListener('canplay', resume, false);
+  v.addEventListener('ended', function () {
+    if (vod) closePlayer(); // terminó el video: de vuelta a los resultados
+    else retry('La transmisión se cortó');
+  }, false);
 
   $('play').onclick = function () { return openPlayer(playUrl); };
   $('channels').onclick = openMenu;
+  $('youtube').onclick = openYouTube;
+  $('ytBack').onclick = closeYouTube;
   $('menuBack').onclick = closeMenu;
   $('back').onclick = closePlayer;
   $('native').onclick = function () { return playUrl !== null; };
   window.onresize = function () {
     layout();
     if (catalog && $('menu').style.display === 'block') renderMenu();
+    if (ytItems && $('yt').style.display === 'block') renderYouTube();
   };
   window.onorientationchange = window.onresize;
 

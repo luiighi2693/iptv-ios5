@@ -17,6 +17,7 @@ const express = require('express');
 const { createHlsProxy, FORWARD_HEADERS, PLAYLIST_TYPE } = require('./lib/hls-proxy');
 const { createTranscoder } = require('./lib/transcoder');
 const { createCatalog, createSource, channelFromUrl } = require('./lib/channels');
+const { createYouTube } = require('./lib/youtube');
 const { readConfig, startRefresher } = require('./scraper');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -24,6 +25,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const CLIP_SECRET = process.env.CLIP_SECRET || '';
 const TRANSCODE = process.env.TRANSCODE === '1';
 const CHANNELS = process.env.SCRAPER !== '0';
+const YOUTUBE = process.env.YOUTUBE !== '0';
 const TARGET_URL = process.env.TARGET_URL || '';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const CLIP_FILE = path.join(DATA_DIR, 'clip.json');
@@ -293,6 +295,7 @@ app.get('/api/status', (req, res) => {
     ageSeconds: clip ? clipAgeSeconds() : null,
     upstreamHost: clip ? new URL(clip.url).host : null,
     transcoding: transcoder ? transcoder.running : false,
+    youtube: YOUTUBE,
   });
 });
 
@@ -307,6 +310,16 @@ app.use(
     log,
   })
 );
+
+if (YOUTUBE) {
+  const youtube = createYouTube({
+    ytdlpPath: process.env.YTDLP_PATH || 'yt-dlp',
+    ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
+    maxHeight: Number(process.env.YT_MAX_HEIGHT) || 480,
+    log,
+  });
+  app.use('/yt', youtube.router);
+}
 
 if (transcoder) {
   app.get('/tv/:file', async (req, res) => {

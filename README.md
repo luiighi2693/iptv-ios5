@@ -66,6 +66,11 @@ TRANSCODE_HEIGHT=480
 TRANSCODE_KBPS=1200
 FFMPEG_PATH=ffmpeg
 
+# YouTube (ver "YouTube")
+YOUTUBE=1                                # 0 = sin el botón de YouTube
+YTDLP_PATH=yt-dlp                        # binario de yt-dlp
+YT_MAX_HEIGHT=480                        # 720 si la conexión del iPad da para ~3 Mbps
+
 # Seguridad (ver "Clave de acceso")
 ACCESS_KEY=                              # clave de la URL; vacía = la generada en el primer arranque, "off" = sin clave
 CLIP_SECRET=                             # si se define, POST /api/clip exige X-Clip-Secret
@@ -135,6 +140,17 @@ TRANSCODE=1
 - El catálogo depende del país de la IP del servidor.
 - Los segmentos usan el cifrado AES-128 estándar de HLS, no DRM: cualquier reproductor HLS, incluido el del iPad, los descifra con la clave que entrega Pluto.
 
+### YouTube
+
+El botón **YOUTUBE** abre un buscador. Muestra 20 videos con miniatura, duración y canal, en páginas que entran en la pantalla. Tocás uno y arranca en unos 5 s, con avance y retroceso.
+
+- **Cómo funciona.** [yt-dlp](https://github.com/yt-dlp/yt-dlp) busca y resuelve cada video. YouTube ya ofrece una versión HLS para iOS: video H.264 Main en TS y audio AAC, en playlists separadas con los mismos cortes. No está claro que el reproductor de iOS 5 soporte el audio en pista aparte, así que el servidor junta video y audio en cada segmento con `ffmpeg -c copy`, sin recodificar. El iPad recibe un HLS común y la CPU casi no trabaja.
+- **Calidad.** 480p por defecto (`YT_MAX_HEIGHT`): H.264 Main, que el iPad 1 decodifica por hardware. Si un video tiene doblajes automáticos, se elige el audio original.
+- **Qué no entra.** Las transmisiones en vivo de YouTube se filtran de los resultados, porque su playlist cambia todo el tiempo. Tampoco entran los videos con restricción de edad o solo para miembros: el servidor no inicia sesión en YouTube.
+- **Instalación.** Hace falta `yt-dlp` en el `PATH` del servidor, o en `YTDLP_PATH`. Por ejemplo, el binario oficial para macOS en `~/.local/bin/yt-dlp`, verificado contra el `SHA2-256SUMS` del release. También usa Node para resolver los desafíos de YouTube; usa el mismo que corre el servidor.
+- **Actualización.** El servidor corre `yt-dlp -U` al arrancar y una vez por día: YouTube cambia seguido y un yt-dlp viejo deja de andar.
+- Sacar el video por fuera del reproductor oficial va contra los términos de uso de YouTube. Este proyecto es para uso personal, en un solo dispositivo.
+
 ### Variantes
 
 - **Sin scraper, carga manual:**
@@ -195,7 +211,7 @@ Guardá esto en `~/Library/LaunchAgents/com.iptv-ios5.server.plist`. Cambiá las
 </plist>
 ```
 
-`WorkingDirectory` tiene que ser la carpeta del proyecto, porque de ahí se lee el `.env`. El `PATH` tiene que incluir ffmpeg.
+`WorkingDirectory` tiene que ser la carpeta del proyecto, porque de ahí se lee el `.env`. El `PATH` tiene que incluir ffmpeg, y también yt-dlp si lo pusiste en `~/.local/bin`. Si cambiás el `.plist`, aplicalo con `bootout` y `bootstrap`: `kickstart` no lo vuelve a leer.
 
 | Para | Comando |
 |---|---|
@@ -234,6 +250,8 @@ El botón usa el `<video>` nativo, que usa el mismo decodificador por hardware q
 | `está trabado (20 s sin segmentos nuevos): lo reinicio` | ffmpeg sigue vivo pero no produce video | Nada: es la red de seguridad. Mientras tanto no se sirve la playlist vieja, así que la página no repite tramos al reconectar |
 | `… rechazó un segmento (403)` | El CDN bloquea el video (región, token) | Si persiste, el canal no sirve desde el país del servidor: el validador lo pasa a gris (o tocá **Revalidar**) |
 | El menú dice "el servidor está armando el catálogo" | Primer arranque: está bajando las listas (~10 s) | Esperá y volvé a abrir el menú. Los canales aparecen en amarillo y se van poniendo verdes o grises a medida que se validan |
+| YouTube: "falta yt-dlp en el servidor" | No está instalado o no está en el `PATH` del servicio | Instalalo (ver "YouTube") o definí `YTDLP_PATH` |
+| YouTube: un video no arranca y el log dice `Sign in…` o `HTTP Error 403` | Restricción de edad o solo para miembros, o YouTube empezó a bloquear la IP del servidor | Probá otro video. Si fallan todos: `yt-dlp -U` y revisá si YouTube pide confirmar que no sos un robot |
 | Muchos canales en gris | Caídos, fuera de horario (no son 24/7) o bloqueados por región para el servidor | Nada: el validador los reintenta solo, cada vez más espaciado. **Revalidar** prueba uno en el momento |
 
 ## API
@@ -250,6 +268,9 @@ Todas las rutas van bajo `/<clave>/` (por ejemplo, `/<clave>/api/status`). Sin l
 | `GET` | `/api/status` | Diagnóstico en JSON. |
 | `GET` | `/live/index.m3u8` | Stream a través del proxy. |
 | `GET` | `/tv/index.m3u8` | Stream transcodificado (con `TRANSCODE=1`). |
+| `GET` | `/yt/search?q=texto` | Búsqueda en YouTube: `{ items: [[id, título, canal, segundos]] }`. |
+| `GET` | `/yt/thumb/<id>.jpg` | Miniatura de un video, por HTTP plano. |
+| `GET` | `/yt/<id>/index.m3u8` | Video de YouTube como HLS VOD, con video y audio juntos en cada segmento. |
 
 ## Uso responsable
 
