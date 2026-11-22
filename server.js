@@ -18,6 +18,7 @@ const { createHlsProxy, FORWARD_HEADERS, PLAYLIST_TYPE } = require('./lib/hls-pr
 const { createTranscoder } = require('./lib/transcoder');
 const { createCatalog, createSource, channelFromUrl } = require('./lib/channels');
 const { createYouTube } = require('./lib/youtube');
+const { createMovies } = require('./lib/movies');
 const { readConfig, startRefresher } = require('./scraper');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -26,6 +27,7 @@ const CLIP_SECRET = process.env.CLIP_SECRET || '';
 const TRANSCODE = process.env.TRANSCODE === '1';
 const CHANNELS = process.env.SCRAPER !== '0';
 const YOUTUBE = process.env.YOUTUBE !== '0';
+const MOVIES_DIR = process.env.MOVIES === '0' ? null : process.env.MOVIES_DIR || path.join(__dirname, 'peliculas');
 const TARGET_URL = process.env.TARGET_URL || '';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const CLIP_FILE = path.join(DATA_DIR, 'clip.json');
@@ -322,6 +324,17 @@ if (YOUTUBE) {
   app.use('/yt', youtube.router);
 }
 
+const movies = MOVIES_DIR
+  ? createMovies({
+      dir: MOVIES_DIR,
+      dataDir: DATA_DIR,
+      ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
+      maxHeight: Number(process.env.MOVIES_HEIGHT) || 480,
+      log,
+    })
+  : null;
+if (movies) app.use('/movies', movies.router);
+
 if (transcoder) {
   app.get('/tv/:file', async (req, res) => {
     const { file } = req.params;
@@ -352,6 +365,10 @@ app.listen(PORT, HOST, () => {
   for (const ip of lanAddresses()) log(`  → En el iPad abrí: http://${ip}:${PORT}${BASE}/`);
   if (!BASE) log('AVISO: ACCESS_KEY=off: cualquiera que llegue a este puerto ve y maneja todo.');
   else if (!process.env.ACCESS_KEY) log(`  (clave generada y guardada en ${ACCESS_KEY_FILE}; para elegir otra, ACCESS_KEY en el .env)`);
+  if (movies) {
+    log(`[películas] carpeta: ${MOVIES_DIR}`);
+    movies.start();
+  }
 
   if (!catalog) return log('Capturador apagado (SCRAPER=0): mandá enlaces a POST /api/clip');
   const unknown = PROVIDERS.filter((p) => p !== 'pluto' && !M3U_URLS.includes(p));
@@ -374,6 +391,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     log('Cerrando…');
     const transcoding = transcoder ? transcoder.stop() : null;
     if (catalog) catalog.stop();
+    if (movies) movies.stop();
     if (refresher) await refresher.stop();
     await transcoding;
     process.exit(0);

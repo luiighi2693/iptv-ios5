@@ -72,6 +72,11 @@ YTDLP_PATH=yt-dlp                        # binario de yt-dlp
 YT_MAX_HEIGHT=480                        # 720 si la conexión del iPad da para ~3 Mbps
 YT_LANG=es                               # idioma de títulos, búsqueda y audio (vacío = audio original)
 
+# Películas locales (ver "Películas locales")
+MOVIES=1                                 # 0 = sin el botón de películas
+MOVIES_DIR=./peliculas                   # carpeta con los videos (se aceptan subcarpetas)
+MOVIES_HEIGHT=480
+
 # Seguridad (ver "Clave de acceso")
 ACCESS_KEY=                              # clave de la URL; vacía = la generada en el primer arranque, "off" = sin clave
 CLIP_SECRET=                             # si se define, POST /api/clip exige X-Clip-Secret
@@ -153,6 +158,24 @@ El botón **YOUTUBE** abre un buscador. Muestra 20 videos con miniatura, duraci�
 - **Actualización.** El servidor corre `yt-dlp -U` al arrancar y una vez por día: YouTube cambia seguido y un yt-dlp viejo deja de andar.
 - Sacar el video por fuera del reproductor oficial va contra los términos de uso de YouTube. Este proyecto es para uso personal, en un solo dispositivo.
 
+### Películas locales
+
+El botón **PELÍCULAS** lista los videos de `MOVIES_DIR` con portada, duración y, si quedó a la mitad, **"Seguir desde…"**. Para sumar una película, la copiás a la carpeta (o a una subcarpeta) y aparece sola.
+
+- **Se convierte una vez, apenas llega, no al reproducirla.** Las películas suelen venir en formatos que el iPad 1 no lee: 1080p, MKV, H.264 High, HEVC o audio 5.1. Cada archivo se pasa en segundo plano a HLS (H.264 Main hasta 480p + AAC estéreo) en `MOVIES_DIR/.ipad/`. Mirar es servir archivos: arranca al instante, se puede adelantar a cualquier punto y no depende de lo ocupado que esté el servidor. Si el video ya es compatible, se copia sin recodificar.
+- **Tiempos:** con material real, unas 8 veces más rápido que la reproducción, así que una película de 2 h tarda unos 15 min. Ocupa cerca de 1 GB extra en `.ipad/`. Las conversiones van de a una y con prioridad baja (`nice`), para no afectar los canales en vivo ni YouTube. La lista muestra "Preparándose… 35 %".
+- **No toca archivos a medio copiar:** espera a que el tamaño deje de cambiar (unos 30 s).
+- **Audio:** si hay varias pistas, la que está en español.
+- **Subtítulos:** se graban en la imagen en dos casos:
+  - hay un `.srt` con el mismo nombre que el video (`pelicula.srt`, `pelicula.es.srt`);
+  - el audio no está en español y el archivo trae subtítulos en español.
+
+  Los `.srt` en Windows-1252, que es lo común en español, se leen bien.
+- **Títulos:** salen del nombre del archivo, sin las etiquetas del release. "The.Matrix.1999.1080p.BluRay.x264.mkv" se muestra como "The Matrix (1999)".
+- **Por dónde iba:** lo guarda el servidor cada 30 s y al salir, en `DATA_DIR/movie-positions.json`, porque el almacenamiento de las web apps de iOS 5.1 se puede borrar solo. Si se cierra en los créditos, cuenta como vista.
+- **Borrar** un video borra su conversión. **Renombrarlo** hace que se convierta de nuevo.
+- **Cómo llegan los videos a la carpeta:** cualquier cosa que copie archivos sirve (Finder, `scp`, Syncthing…).
+
 ### Variantes
 
 - **Sin scraper, carga manual:**
@@ -213,7 +236,7 @@ Guardá esto en `~/Library/LaunchAgents/com.iptv-ios5.server.plist`. Cambiá las
 </plist>
 ```
 
-`WorkingDirectory` tiene que ser la carpeta del proyecto, porque de ahí se lee el `.env`. El `PATH` tiene que incluir ffmpeg, y también yt-dlp si lo pusiste en `~/.local/bin`. Si cambiás el `.plist`, aplicalo con `bootout` y `bootstrap`: `kickstart` no lo vuelve a leer.
+`WorkingDirectory` tiene que ser la carpeta del proyecto, porque de ahí se lee el `.env`. Las variables de `EnvironmentVariables` del `.plist` (por ejemplo, `MOVIES_DIR`) tienen prioridad sobre el `.env`. El `PATH` tiene que incluir ffmpeg, y también yt-dlp si lo pusiste en `~/.local/bin`. Si cambiás el `.plist`, aplicalo con `bootout` y `bootstrap`: `kickstart` no lo vuelve a leer.
 
 | Para | Comando |
 |---|---|
@@ -254,6 +277,8 @@ El botón usa el `<video>` nativo, que usa el mismo decodificador por hardware q
 | El menú dice "el servidor está armando el catálogo" | Primer arranque: está bajando las listas (~10 s) | Esperá y volvé a abrir el menú. Los canales aparecen en amarillo y se van poniendo verdes o grises a medida que se validan |
 | YouTube: "falta yt-dlp en el servidor" | No está instalado o no está en el `PATH` del servicio | Instalalo (ver "YouTube") o definí `YTDLP_PATH` |
 | YouTube: un video no arranca y el log dice `Sign in…` o `HTTP Error 403` | Restricción de edad o solo para miembros, o YouTube empezó a bloquear la IP del servidor | Probá otro video. Si fallan todos: `yt-dlp -U` y revisá si YouTube pide confirmar que no sos un robot |
+| Una película no aparece | Recién copiada: espera a que termine de copiarse | Esperá un minuto. Si no aparece nunca, revisá en el log la línea `[películas] carpeta:` y la extensión del archivo |
+| "No se pudo preparar este archivo" | Archivo dañado, incompleto o sin video | El log dice el motivo (`[películas] no pude convertir…`). Volvé a copiarlo: al cambiar de tamaño se reintenta solo |
 | Muchos canales en gris | Caídos, fuera de horario (no son 24/7) o bloqueados por región para el servidor | Nada: el validador los reintenta solo, cada vez más espaciado. **Revalidar** prueba uno en el momento |
 
 ## API
@@ -273,6 +298,9 @@ Todas las rutas van bajo `/<clave>/` (por ejemplo, `/<clave>/api/status`). Sin l
 | `GET` | `/yt/search?q=texto` | Búsqueda en YouTube: `{ items: [[id, título, canal, segundos]] }`. |
 | `GET` | `/yt/thumb/<id>.jpg` | Miniatura de un video, por HTTP plano. |
 | `GET` | `/yt/<id>/index.m3u8` | Video de YouTube como HLS VOD, con video y audio juntos en cada segmento. |
+| `GET` | `/movies/list` | Películas: `{ items: [[id, título, segundos, estado, % preparado, segundo donde quedó]] }`. Estado: `ready`, `converting`, `queued`, `copying` o `error`. |
+| `GET` | `/movies/<id>/index.m3u8` | Película convertida, como HLS VOD (también `poster.jpg`). |
+| `POST` | `/movies/<id>/position` | Guarda por dónde va (segundos, en texto plano). |
 
 ## Uso responsable
 

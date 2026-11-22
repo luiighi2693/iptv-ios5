@@ -35,13 +35,17 @@
   .btn.off .tri { display: none; }
   #channel { margin-top: 26px; font-size: 28px; color: #fff; }
   #status { margin-top: 12px; font-size: 20px; color: #aaa; }
+  /* Los tres botones en una fila (font-size 0 en la caja: sin huecos entre inline-blocks) */
+  #navs { width: 70%; margin: 40px auto 0; font-size: 0; }
   .nav {
-    display: block; width: 70%; margin: 40px auto 0; padding: 24px 0;
-    font-size: 30px; font-weight: bold; color: #fff; text-decoration: none;
+    display: inline-block; width: 32%; margin: 0 0.66%; padding: 26px 0;
+    -webkit-box-sizing: border-box; box-sizing: border-box; /* el borde dentro del 32 % */
+    font-size: 24px; font-weight: bold; color: #fff; text-decoration: none;
     background: #23395f; border: 3px solid #36598f;
     -webkit-border-radius: 22px; border-radius: 22px;
   }
-  #youtube { margin-top: 20px; background: #6e1d1d; border-color: #9c2c2c; }
+  #youtube { background: #6e1d1d; border-color: #9c2c2c; }
+  #movies { background: #4a2a6b; border-color: #6e40a0; }
   #native { display: inline-block; margin-top: 40px; padding: 12px 20px; font-size: 18px; color: #6af; text-decoration: none; }
 
   .bar { height: 56px; line-height: 56px; padding: 0 12px; background: #1a1a1a; overflow: hidden; white-space: nowrap; }
@@ -52,7 +56,7 @@
   }
   .title { display: inline-block; margin-left: 18px; vertical-align: middle; font-size: 20px; color: #aaa; }
 
-  #menu, #yt { display: none; }
+  #menu, #yt, #mv { display: none; }
   #list a {
     display: block; height: 72px; line-height: 72px; padding: 0 24px;
     font-size: 24px; color: #eee; text-decoration: none; border-bottom: 1px solid #262626;
@@ -87,21 +91,23 @@
   }
   #ytq { width: 360px; }
   .note { padding: 40px 24px; font-size: 22px; color: #aaa; text-align: center; }
-  #pager, #ytPager { display: none; height: 82px; line-height: 82px; padding: 0 12px; text-align: center; font-size: 20px; color: #aaa; }
-  #pager a, #ytPager a {
+  #pager, #ytPager, #mvPager { display: none; height: 82px; line-height: 82px; padding: 0 12px; text-align: center; font-size: 20px; color: #aaa; }
+  #pager a, #ytPager a, #mvPager a {
     display: inline-block; padding: 0 24px; line-height: 54px; vertical-align: middle;
     font-size: 22px; color: #fff; text-decoration: none; background: #333;
     -webkit-border-radius: 10px; border-radius: 10px;
   }
-  #pager a.off, #ytPager a.off { visibility: hidden; }
-  #prev, #ytPrev { float: left; margin-top: 14px; }
-  #next, #ytNext { float: right; margin-top: 14px; }
+  #pager a.off, #ytPager a.off, #mvPager a.off { visibility: hidden; }
+  #prev, #ytPrev, #mvPrev { float: left; margin-top: 14px; }
+  #next, #ytNext, #mvNext { float: right; margin-top: 14px; }
 
-  /* YouTube: miniatura, título (hasta dos líneas) y duración · canal */
-  #ytList a { display: block; height: 100px; color: #eee; text-decoration: none; border-bottom: 1px solid #262626; overflow: hidden; }
-  #ytList img { float: left; width: 160px; height: 90px; margin: 5px 18px 5px 12px; background: #222; }
-  #ytList .t { display: block; margin: 14px 24px 0 0; font-size: 22px; line-height: 28px; max-height: 56px; overflow: hidden; }
-  #ytList .m { display: block; margin: 6px 24px 0 0; font-size: 17px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* YouTube y películas: miniatura, título (hasta dos líneas) y una línea de datos */
+  .media a { display: block; height: 100px; color: #eee; text-decoration: none; border-bottom: 1px solid #262626; overflow: hidden; }
+  .media img, .media .ph { display: block; float: left; width: 160px; height: 90px; margin: 5px 18px 5px 12px; background: #222; }
+  .media .t { display: block; margin: 14px 24px 0 0; font-size: 22px; line-height: 28px; max-height: 56px; overflow: hidden; }
+  .media .m { display: block; margin: 6px 24px 0 0; font-size: 17px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .media a.off { color: #777; }
+  .media .go { color: #4cd964; }
 
   #player { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; }
   #video { display: block; width: 100%; background: #000; }
@@ -113,8 +119,7 @@
   <a id="play" class="btn off" href="#"><span class="tri"></span><span id="label">Esperando señal</span></a>
   <div id="channel"></div>
   <div id="status">Conectando con el servidor…</div>
-  <a id="channels" class="nav" href="#">CANALES</a>
-  <a id="youtube" class="nav" href="#">YOUTUBE</a>
+  <div id="navs"><a id="channels" class="nav" href="#">CANALES</a><a id="youtube" class="nav" href="#">YOUTUBE</a><a id="movies" class="nav" href="#">PELÍCULAS</a></div>
   <a id="native" href="#">Abrir en el reproductor nativo de iOS</a>
 </div>
 
@@ -132,8 +137,14 @@
     <form id="ytForm" class="search" action="#"><input id="ytq" type="search" placeholder="Buscar en YouTube" autocomplete="off" autocorrect="off" autocapitalize="off"></form>
     <a id="ytBack" class="back" href="#">&lsaquo; Volver</a><span id="ytTitle" class="title">YouTube</span>
   </div>
-  <div id="ytList"></div>
+  <div id="ytList" class="media"></div>
   <div id="ytPager"><a id="ytPrev" href="#">&lsaquo; Anterior</a><span id="ytPageInfo"></span><a id="ytNext" href="#">Siguiente &rsaquo;</a></div>
+</div>
+
+<div id="mv">
+  <div class="bar"><a id="mvBack" class="back" href="#">&lsaquo; Volver</a><span id="mvTitle" class="title">Películas</span></div>
+  <div id="mvList" class="media"></div>
+  <div id="mvPager"><a id="mvPrev" href="#">&lsaquo; Anterior</a><span id="mvPageInfo"></span><a id="mvNext" href="#">Siguiente &rsaquo;</a></div>
 </div>
 
 <div id="player">
@@ -155,6 +166,8 @@
   var PAGER_HEIGHT = 82;
   var YT_ROW_HEIGHT = 101;
   var YT_SEARCH_TIMEOUT_MS = 60000; // yt-dlp tarda unos segundos en buscar
+  var MV_REFRESH_MS = 15000;        // con películas preparándose, la lista se actualiza sola
+  var MV_SAVE_MS = 30000;           // cada cuánto se guarda por dónde va la película
 
   var playUrl = null;   // enlace vigente según el servidor
   var watchUrl = null;  // enlace que se está mirando (sobrevive a cortes del sondeo)
@@ -174,6 +187,14 @@
   var ytQuery = '';
   var ytPage = 0;
   var ytSeq = 0;        // descarta respuestas de búsquedas anteriores
+
+  // Películas: [[id, título, segundos, estado, % preparado, segundo donde quedó], ...]
+  // estado: 'ready', 'converting', 'queued', 'copying' o 'error'
+  var mvItems = null;
+  var mvPage = 0;
+  var mvTimer = null;
+  var movieId = null;   // la película que se está mirando (para guardar por dónde va)
+  var lastSaved = 0;
 
   // Menú: { active, play, groups: [{ name, channels: [[id, nombre, estado], ...] }] }
   // estado: 'ok' (verde), 'pending' (amarillo), 'dead' (gris); 'checking' sólo existe acá.
@@ -261,6 +282,8 @@
       else if (status === 204) setWaiting('Buscando la señal del canal…');
       else setWaiting('Sin conexión con el servidor, reintentando…');
       checkFrozen();
+      // Sin esperar a que retome (resumeAt): guardaría el segundo 0 de la recarga.
+      if (watching && movieId && !resumeAt && !video().paused && now() - lastSaved > MV_SAVE_MS) savePosition(video().currentTime);
       setTimeout(poll, POLL_MS);
     });
   }
@@ -623,6 +646,113 @@
     return false;
   };
 
+  // ---- Películas locales: el servidor convierte cada archivo una vez; acá sólo se listan.
+
+  function mvNote(text) {
+    $('mvList').innerHTML = '<div class="note">' + escapeHtml(text) + '</div>';
+    show('mvPager', false);
+  }
+
+  function openMovies() {
+    show('home', false);
+    show('mv', true);
+    mvPage = 0;
+    mvNote('Cargando películas…');
+    loadMovies();
+    return false;
+  }
+
+  function closeMovies() {
+    clearTimeout(mvTimer);
+    show('mv', false);
+    show('home', true);
+    $('mvList').innerHTML = ''; // suelta las portadas
+    return false;
+  }
+
+  function loadMovies() {
+    clearTimeout(mvTimer);
+    get('movies/list', function (status, body) {
+      var data = null;
+      var i, busy = false;
+      if ($('mv').style.display !== 'block') return;
+      if (status === 200) {
+        try { data = JSON.parse(body); } catch (e) { data = null; }
+      }
+      if (!data) return mvNote(status === 404 ? 'Las películas están apagadas en el servidor (MOVIES=0).' : 'No pude cargar las películas. Volvé a intentar.');
+      mvItems = data.items;
+      renderMovies();
+      for (i = 0; i < mvItems.length; i++) if (mvItems[i][3] !== 'ready' && mvItems[i][3] !== 'error') busy = true;
+      if (busy) mvTimer = setTimeout(loadMovies, MV_REFRESH_MS);
+    });
+  }
+
+  function movieInfo(item) {
+    if (item[3] === 'ready') return duration(item[2]) + (item[5] > 60 ? ' · <span class="go">Seguir desde ' + duration(item[5]) + '</span>' : '');
+    if (item[3] === 'converting') return 'Preparándose para el iPad… ' + item[4] + '%';
+    if (item[3] === 'queued') return 'En espera para prepararse';
+    if (item[3] === 'copying') return 'Copiándose al servidor…';
+    return 'No se pudo preparar este archivo';
+  }
+
+  function renderMovies() {
+    var size = Math.max(3, Math.floor((window.innerHeight - BAR_HEIGHT - PAGER_HEIGHT) / YT_ROW_HEIGHT));
+    var count = mvItems.length;
+    var pages = Math.max(1, Math.ceil(count / size));
+    var html = '';
+    var i, item, ready;
+    setText('mvTitle', count === 1 ? '1 película' : count + ' películas');
+    if (!count) return mvNote('Todavía no hay películas. Copialas a la carpeta del servidor y aparecen acá solas.');
+    if (mvPage >= pages) mvPage = pages - 1;
+    for (i = mvPage * size; i < Math.min(count, (mvPage + 1) * size); i++) {
+      item = mvItems[i];
+      ready = item[3] === 'ready';
+      html += '<a href="#" data-key="' + i + '"' + (ready ? '' : ' class="off"') + '>' +
+        (ready ? '<img src="movies/' + item[0] + '/poster.jpg" width="160" height="90" alt="">' : '<span class="ph"></span>') +
+        '<span class="t">' + escapeHtml(item[1]) + '</span><span class="m">' + movieInfo(item) + '</span></a>';
+    }
+    $('mvList').innerHTML = html;
+    show('mvPager', pages > 1);
+    setText('mvPageInfo', (mvPage + 1) + ' / ' + pages);
+    $('mvPrev').className = mvPage > 0 ? '' : 'off';
+    $('mvNext').className = mvPage < pages - 1 ? '' : 'off';
+    window.scrollTo(0, 0);
+  }
+
+  $('mvList').onclick = function (event) {
+    var el = event.target;
+    var item;
+    if (el && el.nodeType === 3) el = el.parentNode;
+    while (el && el !== this && !el.getAttribute('data-key')) el = el.parentNode;
+    if (!el || el === this || !mvItems) return false;
+    item = mvItems[parseInt(el.getAttribute('data-key'), 10)];
+    if (item[3] !== 'ready') return false;
+    clearTimeout(mvTimer);
+    return openPlayer('movies/' + item[0] + '/index.m3u8', { title: item[1], vod: true, from: 'mv', movie: item[0], position: item[5] });
+  };
+
+  $('mvPrev').onclick = function () {
+    if (mvPage > 0) { mvPage--; renderMovies(); }
+    return false;
+  };
+  $('mvNext').onclick = function () {
+    mvPage++;
+    renderMovies();
+    return false;
+  };
+
+  // Por dónde va la película: lo guarda el servidor (el almacenamiento de las web apps de
+  // iOS 5.1 puede borrarse solo). Casi al final, el servidor lo toma como vista.
+  function savePosition(seconds) {
+    var i;
+    if (!movieId || seconds < 5) return;
+    lastSaved = now();
+    request('POST', 'movies/' + movieId + '/position', String(Math.floor(seconds)), XHR_TIMEOUT_MS, function () {});
+    for (i = 0; mvItems && i < mvItems.length; i++) {
+      if (mvItems[i][0] === movieId) mvItems[i][5] = seconds > mvItems[i][2] - Math.min(120, mvItems[i][2] * 0.05) ? 0 : Math.floor(seconds);
+    }
+  }
+
   // ---- Reproductor: <video> nativo. Usa el mismo decodificador por hardware que
   // QuickTime, pero nos deja reintentar solos si el stream se corta.
 
@@ -640,7 +770,7 @@
     v.play();
   }
 
-  // options: { title, vod, from }. Sin options, el canal en vivo.
+  // options: { title, vod, from, movie, position }. Sin options, el canal en vivo.
   function openPlayer(url, options) {
     if (!url) return false;
     options = options || {};
@@ -649,13 +779,16 @@
     vod = Boolean(options.vod);
     watchTitle = options.title || channelName;
     returnTo = options.from || 'home';
-    resumeAt = 0;
+    movieId = options.movie || null;
+    resumeAt = options.position || 0; // una película que quedó por la mitad sigue desde ahí
+    lastSaved = now();
     askedFullscreen = false;
     lastTime = -1;
     frozenPolls = 0;
     show('home', false);
     show('menu', false);
     show('yt', false);
+    show('mv', false);
     show('player', true);
     layout();
     setMsg((vod ? 'Preparando ' : 'Cargando ') + (watchTitle || '…'));
@@ -665,13 +798,16 @@
 
   function closePlayer() {
     var v = video();
+    if (movieId && !resumeAt) savePosition(v.currentTime);
     watching = false;
+    movieId = null;
     clearTimeout(retryTimer);
     v.pause();
     v.removeAttribute('src');
     v.load(); // suelta el decodificador y la RAM: con 256 MB importa
     show('player', false);
     show(returnTo, true);
+    if (returnTo === 'mv') loadMovies(); // vuelve con "Seguir desde…" al día
     return false;
   }
 
@@ -732,6 +868,8 @@
   $('channels').onclick = openMenu;
   $('youtube').onclick = openYouTube;
   $('ytBack').onclick = closeYouTube;
+  $('movies').onclick = openMovies;
+  $('mvBack').onclick = closeMovies;
   $('menuBack').onclick = closeMenu;
   $('back').onclick = closePlayer;
   $('native').onclick = function () { return playUrl !== null; };
@@ -739,6 +877,7 @@
     layout();
     if (catalog && $('menu').style.display === 'block') renderMenu();
     if (ytItems && $('yt').style.display === 'block') renderYouTube();
+    if (mvItems && $('mv').style.display === 'block') renderMovies();
   };
   window.onorientationchange = window.onresize;
 
