@@ -174,7 +174,17 @@ El botón **PELÍCULAS** lista los videos de `MOVIES_DIR` con portada, duración
 - **Títulos:** salen del nombre del archivo, sin las etiquetas del release. "The.Matrix.1999.1080p.BluRay.x264.mkv" se muestra como "The Matrix (1999)".
 - **Por dónde iba:** lo guarda el servidor cada 30 s y al salir, en `DATA_DIR/movie-positions.json`, porque el almacenamiento de las web apps de iOS 5.1 se puede borrar solo. Si se cierra en los créditos, cuenta como vista.
 - **Borrar** un video borra su conversión. **Renombrarlo** hace que se convierta de nuevo.
-- **Cómo llegan los videos a la carpeta:** cualquier cosa que copie archivos sirve (Finder, `scp`, Syncthing…).
+- **Cómo llegan los videos a la carpeta:** con la página de administración (abajo) o con cualquier cosa que copie archivos (Finder, `scp`, Syncthing…).
+
+#### Administrar desde el navegador
+
+`http://IP:3000/<clave>/admin.html`, desde una computadora o un celular (no desde el iPad 1: el Safari de iOS 5 no deja elegir archivos). La página lista lo que hay en la carpeta, con su estado. Desde ahí se puede:
+
+- **Subir** videos y `.srt`, arrastrándolos o eligiéndolos. Van en pedazos de 8 MB: si la conexión se corta, se reintenta sola, y si cerrás la página, al volver a elegir el mismo archivo sigue desde donde quedó. Al terminar se convierte enseguida, sin la espera de 30 s.
+- **Borrar** una película, con sus subtítulos y su conversión, o un `.srt` suelto.
+- **Descartar** una subida que quedó por la mitad.
+
+Un `.srt` subido para una película que ya estaba lista hace que se convierta de nuevo con los subtítulos grabados. Solo se aceptan videos y `.srt` con nombres simples (sin carpetas ni ocultos), y siempre quedan 5 GB libres en el disco. Las subidas a medias quedan en `MOVIES_DIR/.uploads/`. La página está detrás de la misma clave que la del iPad.
 
 ### Variantes
 
@@ -301,6 +311,11 @@ Todas las rutas van bajo `/<clave>/` (por ejemplo, `/<clave>/api/status`). Sin l
 | `GET` | `/movies/list` | Películas: `{ items: [[id, título, segundos, estado, % preparado, segundo donde quedó]] }`. Estado: `ready`, `converting`, `queued`, `copying` o `error`. |
 | `GET` | `/movies/<id>/index.m3u8` | Película convertida, como HLS VOD (también `poster.jpg`). |
 | `POST` | `/movies/<id>/position` | Guarda por dónde va (segundos, en texto plano). |
+| `GET` | `/movies/admin/files` | Para la administración: películas con estado y subtítulos, `.srt` sueltos, subidas a medias y espacio libre. |
+| `GET` | `/movies/admin/upload?name=` | Cuánto llegó de una subida (`received`), o `exists` si ya hay un archivo con ese nombre. |
+| `PUT` | `/movies/admin/upload?name=&offset=&total=` | Un pedazo de la subida, en crudo. Si `offset` no coincide con lo recibido: `409` con `received`. |
+| `DELETE` | `/movies/admin/upload?name=` | Descarta una subida a medias. |
+| `DELETE` | `/movies/admin/files?path=` | Borra un video (con sus `.srt`) o un `.srt`. |
 
 ## Uso responsable
 

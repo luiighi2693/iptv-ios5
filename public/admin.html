@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Administrar películas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Página para el administrador (navegador moderno, no el iPad): subir y borrar películas. */
+  :root { --bg: #111; --card: #1b1b1b; --line: #2a2a2a; --text: #eee; --dim: #999; --ok: #34c759; --warn: #ffcc00; --bad: #ff5f57; --accent: #6e40a0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  h2 { margin: 32px 0 12px; font-size: 18px; color: var(--dim); font-weight: 600; }
+  .sub { color: var(--dim); font-size: 14px; word-break: break-all; }
+  .drop {
+    display: block; margin-top: 20px; padding: 28px 16px; text-align: center; background: var(--card);
+    border: 2px dashed #444; border-radius: 14px; cursor: pointer;
+  }
+  .drop.over { border-color: var(--accent); background: #221a2c; }
+  .drop strong { display: block; font-size: 18px; margin-bottom: 6px; }
+  .drop .sub { word-break: normal; }
+  input[type=file] { display: none; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--card); border-radius: 10px; margin-bottom: 8px; }
+  .row .grow { flex: 1; min-width: 0; }
+  .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { color: var(--dim); font-size: 13px; margin-top: 2px; overflow-wrap: anywhere; }
+  .bar { height: 6px; background: #333; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .pill { font-size: 12px; padding: 3px 9px; border-radius: 99px; background: #333; white-space: nowrap; }
+  .pill.ready { background: #173d22; color: var(--ok); }
+  .pill.converting, .pill.queued, .pill.copying { background: #3d3517; color: var(--warn); }
+  .pill.error { background: #3d1717; color: var(--bad); }
+  .chip { display: inline-block; margin: 6px 6px 0 0; padding: 2px 4px 2px 9px; font-size: 12px; background: #262626; border-radius: 99px; }
+  button {
+    font: inherit; font-size: 14px; color: var(--text); background: #333; border: 0; border-radius: 8px;
+    padding: 7px 12px; cursor: pointer;
+  }
+  button:hover { background: #444; }
+  button.danger { color: var(--bad); }
+  .chip button { padding: 0 6px; background: none; color: var(--dim); }
+  .empty { color: var(--dim); padding: 12px 2px; }
+  .err { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Películas</h1>
+  <div class="sub" id="where">Cargando…</div>
+
+  <label class="drop" id="drop">
+    <strong>Arrastrá películas acá o tocá para elegir</strong>
+    <span class="sub">Videos (.mp4, .mkv, .avi…) y subtítulos .srt con el mismo nombre que la película. Si una subida se corta, elegí el mismo archivo de nuevo: sigue desde donde quedó.</span>
+    <input type="file" id="pick" multiple accept="video/*,.mkv,.avi,.m4v,.ts,.m2ts,.webm,.flv,.wmv,.mpg,.mpeg,.vob,.divx,.3gp,.srt">
+  </label>
+
+  <div id="jobs"></div>
+
+  <h2>En el servidor</h2>
+  <div id="movies"><div class="empty">Cargando…</div></div>
+</main>
+
+<script>
+// Rutas relativas: la página vive bajo /<clave>/, como la del iPad.
+const API = 'movies/admin/';
+const CHUNK = 8 * 1024 * 1024; // pedazos de 8 MB: una subida cortada pierde a lo sumo uno
+const MAX_ATTEMPTS = 30;
+const jobs = []; // { file, sent, state, error, cancelled, attempts, speed }
+let running = false;
+let server = null;
+
+const $ = (id) => document.getElementById(id);
+const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const q = (name) => encodeURIComponent(name.normalize('NFC'));
+
+function bytes(n) {
+  if (n >= 1024 ** 3) return (n / 1024 ** 3).toFixed(2) + ' GB';
+  if (n >= 1024 ** 2) return (n / 1024 ** 2).toFixed(1) + ' MB';
+  return Math.round(n / 1024) + ' KB';
+}
+
+function clock(seconds) {
+  if (!isFinite(seconds)) return '…';
+  const h = Math.floor(seconds / 3600), m = Math.floor(seconds / 60) % 60;
+  return h ? `${h} h ${m} min` : m ? `${m} min` : `${Math.ceil(seconds)} s`;
+}
+
+// ---- Subidas: de a una, los .srt primero (así la película ya se convierte con ellos).
+
+function enqueue(files) {
+  for (const file of files) jobs.push({ file, sent: 0, state: 'En cola', error: null, cancelled: false, attempts: 0, speed: 0 });
+  jobs.sort((a, b) => (a.state === 'En cola' && b.state === 'En cola' ? /\.srt$/i.test(b.file.name) - /\.srt$/i.test(a.file.name) : 0));
+  renderJobs();
+  run();
+}
+
+async function run() {
+  if (running) return;
+  running = true;
+  let job;
+  while ((job = jobs.find((j) => j.state === 'En cola'))) await upload(job);
+  running = false;
+  refresh();
+}
+
+async function status(job) {
+  const res = await fetch(`${API}upload?name=${q(job.file.name)}`, { cache: 'no-store' });
+  const body = await res.json();
+  if (!res.ok) throw Object.assign(new Error(body.error || `error ${res.status}`), { fatal: true });
+  if (body.exists) throw Object.assign(new Error('ya hay un archivo con ese nombre en el servidor'), { fatal: true });
+  return body.received;
+}
+
+// Un pedazo por XHR (fetch no informa el progreso de la subida).
+function put(job, offset, end) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const started = Date.now();
+    job.xhr = xhr;
+    xhr.open('PUT', `${API}upload?name=${q(job.file.name)}&offset=${offset}&total=${job.file.size}`);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = (e) => {
+      job.sent = offset + e.loaded;
+      const elapsed = (Date.now() - started) / 1000;
+      if (elapsed > 0.5) job.speed = e.loaded / elapsed;
+      renderJobs();
+    };
+    xhr.onload = () => {
+      let body = {};
+      try { body = JSON.parse(xhr.responseText); } catch { /* sin cuerpo */ }
+      resolve({ status: xhr.status, body });
+    };
+    xhr.onerror = () => reject(new Error('se cortó la conexión'));
+    xhr.onabort = () => reject(new Error('cancelada'));
+    xhr.send(job.file.slice(offset, end));
+  });
+}
+
+async function upload(job) {
+  job.state = 'Subiendo';
+  renderJobs();
+  try {
+    let offset = await status(job);
+    while (offset < job.file.size) {
+      if (job.cancelled) throw new Error('cancelada');
+      try {
+        const { status: code, body } = await put(job, offset, Math.min(offset + CHUNK, job.file.size));
+        if (code === 409 && typeof body.received === 'number') offset = body.received; // el servidor dice desde dónde
+        else if (code === 409 || code === 400 && !('received' in body) || code === 507) throw Object.assign(new Error(body.error || `error ${code}`), { fatal: true });
+        else if (code !== 200) throw new Error(body.error || `el servidor respondió ${code}`);
+        else offset = body.received;
+        job.sent = offset;
+        job.attempts = 0;
+      } catch (err) {
+        if (err.fatal || job.cancelled) throw err;
+        // Se cortó: esperar cada vez un poco más y preguntar cuánto llegó.
+        job.attempts++;
+        if (job.attempts > MAX_ATTEMPTS) throw err;
+        job.state = `Reconectando (${err.message})…`;
+        renderJobs();
+        await sleep(Math.min(30000, 1000 * 2 ** Math.min(job.attempts, 5)));
+        offset = await status(job).catch(() => offset);
+        job.state = 'Subiendo';
+      }
+    }
+    job.state = 'Subida: se está preparando para el iPad';
+  } catch (err) {
+    job.state = job.cancelled ? 'Cancelada' : 'Error';
+    job.error = job.cancelled ? null : err.message;
+  }
+  job.xhr = null;
+  renderJobs();
+  refresh();
+}
+
+function cancel(index) {
+  const job = jobs[index];
+  job.cancelled = true;
+  if (job.xhr) job.xhr.abort();
+  if (job.state === 'En cola') job.state = 'Cancelada';
+  renderJobs();
+}
+
+function renderJobs() {
+  $('jobs').innerHTML = jobs.map((job, i) => {
+    const pct = job.file.size ? Math.floor((job.sent / job.file.size) * 100) : 0;
+    const active = job.state === 'Subiendo' || job.state.startsWith('Reconectando');
+    const eta = job.speed ? (job.file.size - job.sent) / job.speed : NaN;
+    const meta = active
+      ? `${pct}% · ${bytes(job.sent)} de ${bytes(job.file.size)} · ${job.speed ? bytes(job.speed) + '/s · faltan ' + clock(eta) : '…'}`
+      : `${bytes(job.file.size)} · ${esc(job.state)}${job.error ? ` · <span class="err">${esc(job.error)}</span>` : ''}`;
+    return `<div class="row"><div class="grow"><div class="name">${esc(job.file.name)}</div>
+      <div class="meta">${active ? esc(job.state === 'Subiendo' ? '' : job.state + ' · ') : ''}${meta}</div>
+      ${active || job.state === 'En cola' ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}</div>
+      ${active || job.state === 'En cola' ? `<button onclick="cancel(${i})">Cancelar</button>` : ''}</div>`;
+  }).join('');
+}
+
+// ---- Lo que hay en el servidor
+
+const LABELS = { ready: 'Lista', converting: 'Preparando', queued: 'En espera', copying: 'Copiándose', error: 'Error' };
+
+async function refresh() {
+  try {
+    const res = await fetch(`${API}files`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status === 404 ? 'las películas están apagadas en el servidor (MOVIES=0)' : `error ${res.status}`);
+    server = await res.json();
+    renderServer();
+  } catch (err) {
+    $('movies').innerHTML = `<div class="empty err">No pude leer la lista: ${esc(err.message)}</div>`;
+  }
+}
+
+function renderServer() {
+  $('where').textContent = `${server.dir} · ${bytes(server.free)} libres en el disco`;
+  const uploading = new Set(jobs.filter((j) => j.state === 'Subiendo' || j.state.startsWith('Reconectando')).map((j) => j.file.name.normalize('NFC')));
+  const rows = [];
+  for (const up of server.uploads.filter((u) => !uploading.has(u.name))) {
+    rows.push(`<div class="row"><div class="grow"><div class="name">${esc(up.name)}</div>
+      <div class="meta">Subida incompleta: llegaron ${bytes(up.received)}. Elegí el mismo archivo para continuar.</div></div>
+      <button class="danger" data-upload="${esc(up.name)}">Descartar</button></div>`);
+  }
+  for (const m of server.movies) {
+    const label = LABELS[m.status] + (m.status === 'converting' ? ` ${m.progress}%` : '');
+    const subs = m.subtitles.map((s) => `<span class="chip">${esc(s.split('/').pop())}<button title="Borrar subtítulo" data-file="${esc(s)}">✕</button></span>`).join('');
+    rows.push(`<div class="row"><div class="grow"><div class="name">${esc(m.title)}</div>
+      <div class="meta">${esc(m.rel)} · ${bytes(m.size)}${m.error ? ` · <span class="err">${esc(m.error)}</span>` : ''}</div>${subs}</div>
+      <span class="pill ${m.status}">${esc(label)}</span>
+      <button class="danger" data-file="${esc(m.rel)}" data-title="${esc(m.title)}">Borrar</button></div>`);
+  }
+  for (const s of server.loose) {
+    rows.push(`<div class="row"><div class="grow"><div class="name">${esc(s)}</div>
+      <div class="meta">Subtítulo sin película con el mismo nombre</div></div>
+      <button class="danger" data-file="${esc(s)}">Borrar</button></div>`);
+  }
+  $('movies').innerHTML = rows.join('') || '<div class="empty">Todavía no hay películas.</div>';
+}
+
+$('movies').onclick = async (event) => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  if (button.dataset.upload) {
+    await fetch(`${API}upload?name=${q(button.dataset.upload)}`, { method: 'DELETE' });
+    return refresh();
+  }
+  const what = button.dataset.title ? `la película "${button.dataset.title}"` : `"${button.dataset.file}"`;
+  if (!confirm(`¿Borrar ${what} del servidor? No se puede deshacer.`)) return;
+  const res = await fetch(`${API}files?path=${encodeURIComponent(button.dataset.file)}`, { method: 'DELETE' });
+  if (!res.ok) alert(`No se pudo borrar (error ${res.status}).`);
+  refresh();
+};
+
+$('pick').onchange = () => {
+  enqueue([...$('pick').files]);
+  $('pick').value = '';
+};
+const drop = $('drop');
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = (e) => {
+  e.preventDefault();
+  drop.classList.remove('over');
+  enqueue([...e.dataTransfer.files]);
+};
+window.onbeforeunload = () => (running ? 'Hay una subida en curso: si salís se corta (después se puede retomar).' : undefined);
+
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>
