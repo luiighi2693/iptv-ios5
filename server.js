@@ -316,6 +316,7 @@ if (YOUTUBE) {
     ytdlpPath: process.env.YTDLP_PATH || 'yt-dlp',
     ffmpegPath: process.env.FFMPEG_PATH || 'ffmpeg',
     maxHeight: Number(process.env.YT_MAX_HEIGHT) || 480,
+    lang: process.env.YT_LANG ?? 'es',
     log,
   });
   app.use('/yt', youtube.router);

@@ -70,6 +70,7 @@ FFMPEG_PATH=ffmpeg
 YOUTUBE=1                                # 0 = sin el botón de YouTube
 YTDLP_PATH=yt-dlp                        # binario de yt-dlp
 YT_MAX_HEIGHT=480                        # 720 si la conexión del iPad da para ~3 Mbps
+YT_LANG=es                               # idioma de títulos, búsqueda y audio (vacío = audio original)
 
 # Seguridad (ver "Clave de acceso")
 ACCESS_KEY=                              # clave de la URL; vacía = la generada en el primer arranque, "off" = sin clave
@@ -145,7 +146,8 @@ TRANSCODE=1
 El botón **YOUTUBE** abre un buscador. Muestra 20 videos con miniatura, duración y canal, en páginas que entran en la pantalla. Tocás uno y arranca en unos 5 s, con avance y retroceso.
 
 - **Cómo funciona.** [yt-dlp](https://github.com/yt-dlp/yt-dlp) busca y resuelve cada video. YouTube ya ofrece una versión HLS para iOS: video H.264 Main en TS y audio AAC, en playlists separadas con los mismos cortes. No está claro que el reproductor de iOS 5 soporte el audio en pista aparte, así que el servidor junta video y audio en cada segmento con `ffmpeg -c copy`, sin recodificar. El iPad recibe un HLS común y la CPU casi no trabaja.
-- **Calidad.** 480p por defecto (`YT_MAX_HEIGHT`): H.264 Main, que el iPad 1 decodifica por hardware. Si un video tiene doblajes automáticos, se elige el audio original.
+- **Calidad.** 480p por defecto (`YT_MAX_HEIGHT`): H.264 Main, que el iPad 1 decodifica por hardware.
+- **Idioma.** YouTube responde según el país del servidor: desde Estados Unidos traduce los títulos al inglés y elige el audio en inglés. Con `YT_LANG=es`, que es el valor por defecto, los títulos y las búsquedas salen en español. En el audio se prefiere la pista en español, sea original o doblada (muchos videos en inglés traen doblaje automático); si no hay, se usa la original.
 - **Qué no entra.** Las transmisiones en vivo de YouTube se filtran de los resultados, porque su playlist cambia todo el tiempo. Tampoco entran los videos con restricción de edad o solo para miembros: el servidor no inicia sesión en YouTube.
 - **Instalación.** Hace falta `yt-dlp` en el `PATH` del servidor, o en `YTDLP_PATH`. Por ejemplo, el binario oficial para macOS en `~/.local/bin/yt-dlp`, verificado contra el `SHA2-256SUMS` del release. También usa Node para resolver los desafíos de YouTube; usa el mismo que corre el servidor.
 - **Actualización.** El servidor corre `yt-dlp -U` al arrancar y una vez por día: YouTube cambia seguido y un yt-dlp viejo deja de andar.
